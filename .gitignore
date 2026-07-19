@@ -1,2 +1,28 @@
 # Ignore generated datasets
 data/*.csv
+
+# Ignore processed files
+data/processed/
+
+# Ignore saved models
+models/*.pkl
+
+# Mac files
+.DS_Store
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# VS Code settings
+.vscode/# Ignore generated datasets
+data/*.csv
+# Ignore generated datasets
+data/*.csv
+
+# Ignore processed files
+data/processed/
+
+# Ignore saved models
+models/*.pkl
+.vscode/
+
