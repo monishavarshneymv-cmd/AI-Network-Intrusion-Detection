@@ -1,6 +1,8 @@
 import streamlit as st
 import sys
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 sys.path.append("src")
 
@@ -16,7 +18,7 @@ st.set_page_config(
 # Sidebar
 # =========================
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Home", "Predict"])
+page = st.sidebar.radio("Go to", ["Home", "Predict", "Dashboard"])
 
 # =========================
 # Home Page
@@ -122,32 +124,98 @@ elif page == "Predict":
     # Predict Button
     # =========================
 
+
     if st.button("Predict"):
+    
+            user_inputs = {
+                "duration": duration,
+                "protocol_type": protocol_type,
+                "service": service,
+                "flag": flag,
+                "src_bytes": src_bytes,
+                "dst_bytes": dst_bytes,
+                "count": count,
+                "srv_count": srv_count,
+                "logged_in": logged_in,
+                "serror_rate": serror_rate,
+                "same_srv_rate": same_srv_rate
+            }
+    
+            prediction, confidence = predict_intrusion_from_form(user_inputs)
+    
+            st.subheader("Prediction Result")
+    
+            if prediction == "attack":
+                st.error("⚠️ Attack Detected")
+            else:
+                st.success("✅ Normal Traffic")
+    
+            st.metric(
+                label="Confidence",
+                value=f"{confidence:.2%}"
+            )
 
-        user_inputs = {
-            "duration": duration,
-            "protocol_type": protocol_type,
-            "service": service,
-            "flag": flag,
-            "src_bytes": src_bytes,
-            "dst_bytes": dst_bytes,
-            "count": count,
-            "srv_count": srv_count,
-            "logged_in": logged_in,
-            "serror_rate": serror_rate,
-            "same_srv_rate": same_srv_rate
-        }
+elif page == "Dashboard":
+    st.title("📊 Model Dashboard")
 
-        prediction, confidence = predict_intrusion_from_form(user_inputs)
+    # --- Model Comparison Table ---
+    st.subheader("Model Comparison")
+    comparison_data = {
+        "Model": ["Decision Tree", "Random Forest", "Logistic Regression", "Random Forest (Tuned)"],
+        "Accuracy": [0.9986, 0.9990, 0.9735, 0.9990],
+        "Precision": [0.9982, 0.9994, 0.9778, 0.9995],
+        "Recall": [0.9987, 0.9985, 0.9650, 0.9985],
+        "F1 Score": [0.9985, 0.9989, 0.9713, 0.9990],
+    }
+    comparison_df = pd.DataFrame(comparison_data)
+    st.dataframe(comparison_df, use_container_width=True)
 
-        st.subheader("Prediction Result")
+    # --- Attack Type Distribution ---
+    st.subheader("Attack Type Distribution (Training Data)")
 
-        if prediction == "attack":
-            st.error("⚠️ Attack Detected")
-        else:
-            st.success("✅ Normal Traffic")
+    columns = [
+        "duration","protocol_type","service","flag","src_bytes","dst_bytes","land",
+        "wrong_fragment","urgent","hot","num_failed_logins","logged_in","num_compromised",
+        "root_shell","su_attempted","num_root","num_file_creations","num_shells",
+        "num_access_files","num_outbound_cmds","is_host_login","is_guest_login","count",
+        "srv_count","serror_rate","srv_serror_rate","rerror_rate","srv_rerror_rate",
+        "same_srv_rate","diff_srv_rate","srv_diff_host_rate","dst_host_count",
+        "dst_host_srv_count","dst_host_same_srv_rate","dst_host_diff_srv_rate",
+        "dst_host_same_src_port_rate","dst_host_srv_diff_host_rate","dst_host_serror_rate",
+        "dst_host_srv_serror_rate","dst_host_rerror_rate","dst_host_srv_rerror_rate",
+        "label","difficulty"
+    ]
+    df_raw = pd.read_csv("data/KDDTrain+.txt", names=columns)
 
-        st.metric(
-            label="Confidence",
-            value=f"{confidence:.2%}"
-        )
+    fig, ax = plt.subplots(figsize=(10, 5))
+    df_raw["label"].value_counts().plot(kind="bar", ax=ax)
+    ax.set_yscale("log")
+    ax.set_title("Attack Type Distribution (log scale)")
+    st.pyplot(fig)
+
+    # --- Binary Class Balance ---
+    st.subheader("Normal vs Attack Balance")
+    df_raw["binary_label"] = df_raw["label"].apply(lambda x: "normal" if x == "normal" else "attack")
+
+    fig2, ax2 = plt.subplots(figsize=(6, 4))
+    sns.countplot(data=df_raw, x="binary_label", ax=ax2)
+    ax2.set_title("Normal vs Attack Count")
+    st.pyplot(fig2)
+
+    # --- Feature Importance ---
+    st.subheader("Top 15 Most Important Features")
+
+    import joblib
+    model = joblib.load("models/random_forest_tuned.pkl")
+    feature_names = joblib.load("models/feature_defaults.pkl").index
+
+    importances = pd.Series(model.feature_importances_, index=feature_names)
+    top_features = importances.sort_values(ascending=False).head(15)
+
+    fig3, ax3 = plt.subplots(figsize=(8, 6))
+    top_features.sort_values().plot(kind="barh", ax=ax3)
+    ax3.set_title("Top 15 Feature Importances (Random Forest, Tuned)")
+    ax3.set_xlabel("Importance")
+    st.pyplot(fig3)
+
+    
