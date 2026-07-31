@@ -49,6 +49,7 @@ elif page == "Predict":
     st.title("🔍 Predict Network Traffic")
 
     st.write("Enter the connection details below.")
+    st.caption("Fields not shown below are automatically filled using average values from the training dataset.")
 
     col1, col2 = st.columns(2)
 
@@ -119,41 +120,60 @@ elif page == "Predict":
             1.0,
             0.0
         )
+    # --- Basic input validation ---
+    validation_errors = []
 
+    if flag == "SF" and src_bytes == 0 and dst_bytes == 0 and duration == 0:
+        validation_errors.append(
+            "A 'SF' (successful) connection with zero duration and zero bytes is unusual - "
+            "results may not be meaningful."
+        )
+
+    if src_bytes > 100_000_000 or dst_bytes > 100_000_000:
+        validation_errors.append(
+            "Byte values this large are extreme outliers rarely seen in real traffic - "
+            "prediction confidence may be unreliable."
+        )
+
+    for warning in validation_errors:
+        st.warning(f"⚠️ {warning}")
     # =========================
     # Predict Button
     # =========================
 
 
     if st.button("Predict"):
-    
-            user_inputs = {
-                "duration": duration,
-                "protocol_type": protocol_type,
-                "service": service,
-                "flag": flag,
-                "src_bytes": src_bytes,
-                "dst_bytes": dst_bytes,
-                "count": count,
-                "srv_count": srv_count,
-                "logged_in": logged_in,
-                "serror_rate": serror_rate,
-                "same_srv_rate": same_srv_rate
-            }
-    
-            prediction, confidence = predict_intrusion_from_form(user_inputs)
-    
+
+        user_inputs = {
+            "duration": duration,
+            "protocol_type": protocol_type,
+            "service": service,
+            "flag": flag,
+            "src_bytes": src_bytes,
+            "dst_bytes": dst_bytes,
+            "count": count,
+            "srv_count": srv_count,
+            "logged_in": logged_in,
+            "serror_rate": serror_rate,
+            "same_srv_rate": same_srv_rate
+        }
+
+        try:
+            with st.spinner("Analyzing traffic..."):
+                prediction, confidence = predict_intrusion_from_form(user_inputs)
+
             st.subheader("Prediction Result")
-    
+
             if prediction == "attack":
                 st.error("⚠️ Attack Detected")
             else:
                 st.success("✅ Normal Traffic")
-    
-            st.metric(
-                label="Confidence",
-                value=f"{confidence:.2%}"
-            )
+
+            st.metric(label="Confidence", value=f"{confidence:.2%}")
+
+        except Exception as e:
+            st.error(f"Something went wrong while making the prediction: {e}")
+            st.info("Try adjusting your inputs and predicting again.")
 
 elif page == "Dashboard":
     st.title("📊 Model Dashboard")
